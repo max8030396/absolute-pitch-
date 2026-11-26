@@ -7,6 +7,19 @@
   const CROWN = '<svg class="crown" viewBox="0 0 64 44" aria-hidden="true"><path d="M5 14l13 12L32 4l14 22 13-12-5 26H10z"/><circle cx="5" cy="12" r="4"/><circle cx="32" cy="4" r="4"/><circle cx="59" cy="12" r="4"/></svg>';
   let timers = [];
 
+  // 演出時間軸（毫秒，從打開結算畫面起算）。finale-sfx.js 的 preview() 也讀這份
+  const TIMELINE = {
+    slam: 300,          // 標題砸下
+    third: 1200,        // 第 3 名升起
+    second: 2700,       // 第 2 名升起
+    gogo: 4200,         // 蓄力開始
+    gogoDur: 1650,      // 蓄力長度：剛好在第 1 名升起後 150ms 收掉
+    first: 5700,        // 第 1 名升起
+    done: 6600,         // 出現按鈕
+    sound: 180,         // 升起後多久播該名次音效（「ドン!」= first + sound）
+    kira: [530, 730],   // 第 1 名升起後的兩聲「叮」
+  };
+
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const later = (ms, fn) => timers.push(setTimeout(fn, ms));
   const fx = () => window.SakugaFX;
@@ -46,11 +59,11 @@
     if (!p) return;
     p.classList.add('in');
     if (p.classList.contains('vacant')) return;
-    later(180, () => snd(big ? 'don' : place === 3 ? 'pon' : 'zuza'));
-    if (big) { later(530, () => snd('kira', 0)); later(730, () => snd('kira', 2)); }
+    later(TIMELINE.sound, () => snd(big ? 'don' : place === 3 ? 'pon' : 'zuza'));
+    if (big) TIMELINE.kira.forEach((ms, i) => later(ms, () => snd('kira', i * 2)));
     const F = fx();
     if (!F) return;
-    later(180, () => {
+    later(TIMELINE.sound, () => {
       const c = F.at(p.querySelector('.f-card'));
       if (big) {
         F.burst(c.x, c.y, { r: 150, spikes: 19, life: 0.6 });
@@ -78,22 +91,24 @@
     el.hidden = false;
     el.classList.remove('done');
     document.body.style.overflow = 'hidden';
-    later(300, () => snd('slam'));
+    const T = TIMELINE;
+    later(T.slam, () => snd('slam'));
     if (!top.length) { el.classList.add('done'); return; }
 
-    later(900, () => reveal(3));
-    later(1800, () => reveal(2));
-    later(2700, () => snd('gogo', 1.15));
-    later(2700, () => {             // 第一名之前的蓄力
+    later(T.third, () => reveal(3));
+    later(T.second, () => reveal(2));
+    later(T.gogo, () => snd('gogo', T.gogoDur / 1000));
+    later(T.gogo, () => {             // 第一名之前的蓄力
       const F = fx(), slotEl = podium.querySelector('.p1 .block');
       if (!F || !slotEl) return;
       const c = F.at(slotEl);
-      F.sfx('gogo', c.x - 120, c.y - 40, { size: 130, rot: -0.2, life: 1.1, ...F.dotted() });
-      F.sfx('gogo', c.x + 120, c.y - 90, { size: 110, rot: 0.15, life: 1.0, ...F.dotted() });
+      const life = T.gogoDur / 1000;
+      F.sfx('gogo', c.x - 120, c.y - 40, { size: 130, rot: -0.2, life, ...F.dotted() });
+      F.sfx('gogo', c.x + 120, c.y - 90, { size: 110, rot: 0.15, life: life - 0.1, ...F.dotted() });
     });
-    later(3700, () => reveal(1, true));
-    later(3880, () => { if (onFirst) onFirst(); });   // 和「ドン!」同一刻
-    later(4600, () => el.classList.add('done'));
+    later(T.first, () => reveal(1, true));
+    later(T.first + T.sound, () => { if (onFirst) onFirst(); });   // 和「ドン!」同一刻
+    later(T.done, () => el.classList.add('done'));
   }
 
   function close() {
@@ -104,5 +119,5 @@
     document.body.style.overflow = '';
   }
 
-  window.Finale = { show, close };
+  window.Finale = { show, close, TIMELINE };
 })();

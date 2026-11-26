@@ -8,7 +8,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const r = await p.evaluate(async () => {
     const buf = await FinaleSfx.preview(); const d = buf.getChannelData(0), sr = buf.sampleRate;
     const win = (a, z) => { let pk = 0, ss = 0; for (let i = Math.floor(a * sr); i < Math.floor(z * sr); i++) { pk = Math.max(pk, Math.abs(d[i])); ss += d[i] * d[i]; } return { peak: +pk.toFixed(2), rms: +Math.sqrt(ss / ((z - a) * sr)).toFixed(3) }; };
-    const beats = { silence0: win(0, 0.28), slam: win(0.3, 0.7), pon: win(1.08, 1.4), zuza: win(1.98, 2.5), gogo_start: win(2.7, 3.0), gogo_end: win(3.55, 3.85), don: win(3.88, 4.3), tail: win(5.6, 6) };
+    const T = Finale.TIMELINE, s = (ms) => ms / 1000, end = buf.duration;
+    const pon = s(T.third + T.sound), zuza = s(T.second + T.sound), go = s(T.gogo), goEnd = s(T.gogo + T.gogoDur), don = s(T.first + T.sound);
+    const beats = { silence0: win(0, s(T.slam) - 0.02), slam: win(s(T.slam), s(T.slam) + 0.4), pon: win(pon, pon + 0.32), zuza: win(zuza, zuza + 0.52), gogo_start: win(go, go + 0.3), gogo_end: win(goEnd - 0.3, goEnd), don: win(don, don + 0.42), tail: win(end - 0.4, end) };
     // 轉 16-bit WAV
     const n = d.length, ab = new ArrayBuffer(44 + n * 2), v = new DataView(ab);
     const ws = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
@@ -29,7 +31,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   });
   await sleep(400);
   await p.evaluate(() => { __t0.v = performance.now() + 250; document.getElementById('final').click(); });
-  await sleep(5300);
+  await sleep(await p.evaluate(() => Finale.TIMELINE.done + 700));
   await p.click('#finBack'); await sleep(500);
   console.log('calls (ms after ceremony start):', (await p.evaluate(() => __calls)).join(', '));
   console.log('errors:', errs.length ? errs : 'none'); await b.close();

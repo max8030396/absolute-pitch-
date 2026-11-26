@@ -59,20 +59,24 @@
     tone('sine', 150, 45, t, 0.35, 0.9);
     noise(t, 0.12, 0.35, 'lowpass', 1200, 300);
   }
-  // 第 3 名「ポン」：彈跳音
+  // 鈴：基音 + 不和諧泛音（×2.76，像鐵琴），清脆、筆電喇叭也放得清楚
+  function bell(f, t, peak, dur = 0.5) {
+    tone('sine', f, f, t, dur, peak, 0.002);
+    tone('sine', f * 2.76, f * 2.76, t, dur * 0.4, peak * 0.35, 0.002);
+  }
+  // 第 3 名「ポン」：一聲清脆的叮（往上挑一下）
   function pon() {
     if (!ensure()) return; const t = now();
-    tone('sine', 520, 1040, t, 0.18, 0.55);
-    tone('triangle', 1040, 2080, t, 0.12, 0.18);
-    tone('sine', 120, 60, t, 0.2, 0.5);
-    noise(t, 0.06, 0.2, 'highpass', 4000);
+    tone('sine', 1568, 2093, t, 0.03, 0.4, 0.002);   // G6 → C7 的小挑音
+    bell(2093, t + 0.03, 0.5, 0.45);                  // C7
+    noise(t, 0.03, 0.25, 'highpass', 6000);           // 敲擊的「喀」
   }
-  // 第 2 名「ズザッ」：滑地摩擦 + 悶響
+  // 第 2 名「ズザッ」：往上刷的「唰」+ 兩聲往上的鈴（比第 3 名多一聲、更亮）
   function zuza() {
     if (!ensure()) return; const t = now();
-    noise(t, 0.28, 0.5, 'bandpass', 3800, 500, 1.4, 0.02);
-    tone('sine', 110, 50, t + 0.2, 0.3, 0.8);
-    noise(t + 0.2, 0.1, 0.3, 'lowpass', 900);
+    noise(t, 0.2, 0.55, 'bandpass', 2500, 9000, 1.2, 0.01);   // 唰：由低往高刷
+    bell(2349, t + 0.14, 0.45, 0.4);                          // D7
+    bell(3136, t + 0.26, 0.45, 0.55);                         // G7
   }
   // 「ゴゴゴゴ」：低頻轟鳴 + 越來越快的小鼓連打，漸強 dur 秒
   function gogo(dur = 1) {
@@ -135,9 +139,24 @@
     setTimeout(() => m.disconnect(), 400);
   }
 
+  // 依 finale.js 的 TIMELINE 算出每個音效的觸發秒數
+  function plan() {
+    const T = window.Finale.TIMELINE, s = (ms) => ms / 1000;
+    return [
+      [s(T.slam), slam],
+      [s(T.third + T.sound), pon],
+      [s(T.second + T.sound), zuza],
+      [s(T.gogo), () => gogo(s(T.gogoDur))],
+      [s(T.first + T.sound), don],
+      ...T.kira.map((ms, i) => [s(T.first + ms), () => kira(i * 2)]),
+    ];
+  }
+
   // 把整段頒獎音效渲染成 AudioBuffer（時間點與 finale.js 相同），方便單獨試聽
   async function preview() {
-    const sr = 44100, off = new OfflineAudioContext(1, sr * 6, sr);
+    const steps = plan();
+    const sr = 44100, len = Math.ceil(steps[steps.length - 1][0] + 2.5);
+    const off = new OfflineAudioContext(1, sr * len, sr);
     const saved = [ctx, master, noiseBuf];
     ctx = off;
     noiseBuf = off.createBuffer(1, sr * 2, sr);
@@ -147,12 +166,11 @@
     comp.threshold.value = -12; comp.ratio.value = 6;
     master = off.createGain(); master.gain.value = 0.7;
     master.connect(comp).connect(off.destination);
-    const plan = [[0.3, slam], [1.08, pon], [1.98, zuza], [2.7, () => gogo(1.15)], [3.88, don], [4.23, () => kira(0)], [4.43, () => kira(2)]];
-    for (const [sec, fn] of plan) { at = sec; fn(); }
+    for (const [sec, fn] of steps) { at = sec; fn(); }
     at = null;
     [ctx, master, noiseBuf] = saved;
     return off.startRendering();
   }
 
-  window.FinaleSfx = { slam, pon, zuza, gogo, don, kira, stop, preview };
+  window.FinaleSfx = { slam, pon, zuza, gogo, don, kira, stop, preview, plan };
 })();

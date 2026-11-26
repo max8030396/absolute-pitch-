@@ -23,16 +23,12 @@ const [out, W, H, n] = [process.argv[2], +(process.argv[3] || 1280), +(process.a
   }, n);
   await sleep(600);
   await p.screenshot({ path: out + '-0-board.png' });
+  // 依 finale.js 的 TIMELINE 決定截圖時間點（各名次升起動畫 0.6 秒，取升起後約 0.6 秒）
+  const T = await p.evaluate(() => Finale.TIMELINE);
+  const shots = [[T.third + 600, '1-third'], [T.second + 600, '2-second'], [T.gogo + T.gogoDur / 2, '3-gogo'], [T.first + 450, '4-first'], [T.done + 1000, '5-done']];
   await p.click('#final');
-  for (const [ms, tag] of [[1500, '1-third'], [2400, '2-second'], [3150, '3-gogo'], [4150, '4-first'], [5600, '5-done']]) {
-    await sleep(ms - (tag === '1-third' ? 0 : 0));
-    await p.screenshot({ path: `${out}-${tag}.png` });
-    await sleep(0);
-    break;
-  }
-  // 依時間點截圖
   const t0 = Date.now();
-  for (const [ms, tag] of [[2400 - 1500, '2-second'], [3150 - 1500, '3-gogo'], [4150 - 1500, '4-first'], [5600 - 1500, '5-done']]) {
+  for (const [ms, tag] of shots) {
     const wait = ms - (Date.now() - t0); if (wait > 0) await sleep(wait);
     await p.screenshot({ path: `${out}-${tag}.png` });
   }
